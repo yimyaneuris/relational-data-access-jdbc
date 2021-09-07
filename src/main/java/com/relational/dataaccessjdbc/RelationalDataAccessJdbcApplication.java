@@ -1,28 +1,29 @@
 package com.relational.dataaccessjdbc;
 
+import com.relational.dataaccessjdbc.model.Ciudad;
+import com.relational.dataaccessjdbc.model.Person;
+import com.relational.dataaccessjdbc.repository.PersonRepository;
+import com.relational.dataaccessjdbc.util.DataBaseSeeder;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.NoUniqueBeanDefinitionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 @SpringBootApplication
+@RequiredArgsConstructor
+@Slf4j
 public class RelationalDataAccessJdbcApplication implements CommandLineRunner {
 
     final JdbcTemplate jdbcTemplate;
-    private static final Logger logger = LoggerFactory.getLogger(RelationalDataAccessJdbcApplication.class);
-
-    @Autowired
-    public RelationalDataAccessJdbcApplication(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
+    final PersonRepository personRepository;
+    final DataBaseSeeder dataBaseSeeder;
 
     public static void main(String[] args) {
         SpringApplication.run(RelationalDataAccessJdbcApplication.class, args);
@@ -30,32 +31,39 @@ public class RelationalDataAccessJdbcApplication implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
+        log.info("Insertando Data en la base de datos");
+        dataBaseSeeder.insertData();
 
-        logger.debug("Creating Tables");
+        log.info("@@ Find all");
+        personRepository.findAll().forEach(System.out::println);
 
-        jdbcTemplate.execute("DROP TABLE customers IF EXISTS ");
-        jdbcTemplate.execute("CREATE TABLE customers(id SERIAL, first_name VARCHAR(255), last_name VARCHAR(255))");
+        log.info("@@ Find by Id");
+        Optional<Person> person = personRepository.findById(1L);
+        person.ifPresent(System.out::println);
 
-        // Split up the array of whole names into an array of first/last names
-        List<Object[]> list = Arrays.asList("Jose Mendez", "Miguel Tiburcio", "Pedro Hernandez", "Maria Josefa")
-                .stream()
-                .map(name -> name.split(" "))
-                .collect(Collectors.toList());
+        log.info("@@ Save");
+        Person p = new Person("Gonze","Carrasco");
+        Person result = personRepository.save(p);
+        log.info(result.toString());
+
+        log.info("@@ Delete");
+        // first you need find the resource and delete after.
+        person.ifPresent(personRepository::delete);
+
+        log.info("@@ Find All");
+        personRepository.findAll().forEach(System.out::println);
+
+        log.info("Find by first name");
+        personRepository.findByFirstName("Julissa").forEach(System.out::println);
+
+        log.info("Update first name by Id");
+        personRepository.updatePerson(2L, "Persona Actualizada");
+
+        log.info("Find All");
+        personRepository.findAll().forEach(System.out::println);
 
 
-        list.forEach(name -> logger.info(String.format("Inserting customer record for %s %s", name[0], name[1])));
-
-        // Uses JdbcTemplate's batchUpdate operation to bulk load data
-        jdbcTemplate.batchUpdate("INSERT INTO customers (first_name, last_name) VALUES (?,?)", list);
-
-        logger.info("Querying for customer records where first_name = 'Josh':");
-
-        jdbcTemplate.query("SELECT * FROM customers WHERE first_name = ?",
-                new Object [] {"Jose"},
-                (rs, row) ->
-                    new Customer(rs.getLong("id"),
-                            rs.getString("first_name"),
-                            rs.getString("last_name"))
-                ).forEach(customer -> logger.info(customer.toString()));
+        log.info("@@ calling a function");
+        personRepository.calculateIncome(4000).ifPresent(System.out::println);
     }
 }
